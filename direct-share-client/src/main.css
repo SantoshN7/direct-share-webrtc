@@ -1,0 +1,12 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+dialog {
+    position: fixed;
+    top: 15%;
+    justify-self: center;
+    max-width: 70%;
+    max-height: 40%;
+}
