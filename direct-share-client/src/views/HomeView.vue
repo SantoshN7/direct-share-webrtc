@@ -1,18 +1,45 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import axios from 'axios';
 const createLobbyDialog = ref<HTMLDialogElement | null>(null);
 const joinLobbyDialog = ref<HTMLDialogElement | null>(null);
-
+const formData = ref({
+  userName: '',
+  lobbyCode: '',
+});
 // Functions to handle creating and joining lobbies
 function createLobby() {
   // Logic to create a lobby
-  console.log('Creating lobby...');
-  createLobbyDialog.value?.close();
+  axios.post('http://localhost:3000/api/createLobby', {
+    userName: formData.value.userName,
+  })
+  .then((response) => {
+    console.log(response.data);
+    createLobbyDialog.value?.close();
+  })
+  .catch((error) => {
+    console.error('Error creating lobby:', error);
+  }).finally(() => {
+    formData.value.userName = ''; // Reset the form data
+  });
 }
+
 function joinLobby() {
   // Logic to join a lobby
-  console.log('Joining lobby...');
-  joinLobbyDialog.value?.close();
+  axios.post('http://localhost:3000/api/validLobby', {
+    userName: formData.value.userName,
+    lobbyId: formData.value.lobbyCode,
+  })
+  .then((response) => {
+    console.log(response.data); // Handle successful lobby join here
+    joinLobbyDialog.value?.close();
+  })
+  .catch((error) => {
+    console.error('Error joining lobby:', error);
+  }).finally(() => {
+    formData.value.userName = '';
+    formData.value.lobbyCode = '';
+  });
 }
 
 </script>
@@ -30,10 +57,10 @@ function joinLobby() {
     <!-- Dialog for create lobby -->
     <dialog ref="createLobbyDialog" class="ds-lobby-dialog">
       <h2>Create Lobby</h2>
-      <form @submit.prevent="createLobby">
+      <form @submit.prevent="createLobby()">
         <div>
           <label for="userName">User Name:</label>
-          <input type="text" name="userName" required />
+          <input v-model="formData.userName" type="text" name="userName" required />
         </div>
         <div>
           <button type="submit">Create</button>
@@ -44,14 +71,14 @@ function joinLobby() {
     <!-- Dialog for joining a lobby -->
     <dialog ref="joinLobbyDialog" class="ds-lobby-dialog">
       <h2>Join Lobby</h2>
-      <form @submit.prevent="joinLobby">
+      <form @submit.prevent="joinLobby()">
         <div>
           <label for="userName">User Name:</label>
-          <input type="text" name="userName" required />
+          <input v-model="formData.userName" type="text" name="userName" required />
         </div>
         <div>
           <label for="lobbyCode">Lobby Code:</label>
-          <input type="text" name="lobbyCode" required />
+          <input v-model="formData.lobbyCode" type="text" name="lobbyCode" required />
         </div>
         <div>
           <button type="submit">Join</button>
