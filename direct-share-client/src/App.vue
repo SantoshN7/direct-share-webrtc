@@ -1,5 +1,11 @@
 <script setup lang="ts">
+import {ref, readonly, provide} from 'vue';
 import { RouterLink, RouterView } from 'vue-router'
+import { nanoid } from 'nanoid';
+
+const userId = nanoid(10);
+provide('userId', readonly(ref(userId)));
+
 </script>
 
 <template>

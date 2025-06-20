@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { inject, ref } from 'vue';
 import axios from 'axios';
+import { useRouter } from 'vue-router'
+
+const router = useRouter();
 const createLobbyDialog = ref<HTMLDialogElement | null>(null);
 const joinLobbyDialog = ref<HTMLDialogElement | null>(null);
+const errorMessage = ref<string>('');
+const userId = inject<string>('userId');
 const formData = ref({
   userName: '',
   lobbyCode: '',
@@ -12,13 +17,17 @@ function createLobby() {
   // Logic to create a lobby
   axios.post('http://localhost:3000/api/createLobby', {
     userName: formData.value.userName,
+    userId: userId,
   })
   .then((response) => {
     console.log(response.data);
     createLobbyDialog.value?.close();
+    router.push({
+      path: `/lobby/${response.data.lobbyId}`,
+    });
   })
   .catch((error) => {
-    console.error('Error creating lobby:', error);
+    errorMessage.value = `Failed to create lobby. ${error.response?.data?.error || error.message}`;
   }).finally(() => {
     formData.value.userName = ''; // Reset the form data
   });
@@ -26,20 +35,35 @@ function createLobby() {
 
 function joinLobby() {
   // Logic to join a lobby
-  axios.post('http://localhost:3000/api/validLobby', {
+  axios.post('http://localhost:3000/api/joinLobby', {
     userName: formData.value.userName,
+    userId: userId,
     lobbyId: formData.value.lobbyCode,
   })
   .then((response) => {
-    console.log(response.data); // Handle successful lobby join here
     joinLobbyDialog.value?.close();
+    router.push({
+      path: `/lobby/${formData.value.lobbyCode}`,
+    });
   })
   .catch((error) => {
+    console.log(error)
+    errorMessage.value = `Failed to join lobby. ${error.response?.data?.error || error.message}`;
     console.error('Error joining lobby:', error);
   }).finally(() => {
     formData.value.userName = '';
     formData.value.lobbyCode = '';
   });
+}
+
+function openCreateLobbyDialog() {
+  errorMessage.value = ''; // Reset error message
+  createLobbyDialog.value?.showModal();
+}
+
+function openJoinLobbyDialog() {
+  errorMessage.value = ''; // Reset error message
+  joinLobbyDialog.value?.showModal();
 }
 
 </script>
@@ -67,6 +91,7 @@ function joinLobby() {
           <button type="button" @click="createLobbyDialog?.close()">Cancel</button>
         </div>
       </form>
+      <p v-if="errorMessage" style="color: red;">{{ errorMessage }}</p>
     </dialog>
     <!-- Dialog for joining a lobby -->
     <dialog ref="joinLobbyDialog" class="ds-lobby-dialog">
@@ -85,6 +110,7 @@ function joinLobby() {
           <button type="button" @click="joinLobbyDialog?.close()">Cancel</button>
         </div>
       </form>
+      <p v-if="errorMessage" style="color: red;">{{ errorMessage }}</p>
     </dialog>
   </div>
 </template>

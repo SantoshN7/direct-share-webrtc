@@ -35,37 +35,40 @@ const lobbies = new Map<string, Lobby>();
 app.post('/api/createLobby', (req, res) => {
   try {
     const data = req.body;
-    if(!data || !data.userName) {
-      res.status(400).send({ error: 'Invalid data' });
+    if(!data || !data.userName || !data.userId) {
+      res.status(400).send({ error: 'Invalid data.' });
       return;
     }
     const lobbyId = nanoid(10);
-    const lobby = new Lobby(lobbyId, data.lobbyName || 'Default Lobby');
+    const lobby = new Lobby(lobbyId, data.userId, data.lobbyName || 'Default Lobby');
+    lobby.addMember({ memberId: data.userId, memberName: data.userName });
     lobbies.set(lobbyId, lobby);
     res.status(200).send({ lobbyId: lobbyId});
     return;
-  } catch (error) {
-    res.status(500).send({ error: 'Failed to create lobby' });
+  } catch (error: unknown) {
+    res.status(500).send({ error: (error as {message: string})?.message || 'Failed to create lobby.' });
     return; 
   }
 });
 
-app.post('/api/validLobby', (req, res) => {
+app.post('/api/joinLobby', (req, res) => {
   try {
     const data = req.body;
-    if (!data || !data.lobbyId) {
-      res.status(400).send({ error: 'Lobby ID is required' });
+    if (!data || !data.lobbyId || !data.userName || !data.userId) {
+      res.status(400).send({ error: 'Lobby ID is required.' });
       return;
     }
     const lobbyId = data.lobbyId as string;
-    if (!lobbies.has(lobbyId)) {  
-      res.status(404).send({ error: 'Lobby not found' });
+    const lobby = lobbies.get(lobbyId);
+    if (!lobby) {  
+      res.status(404).send({ error: 'Lobby not found.' });
       return;
     }
+    lobby.addMember({ memberId: data.userId, memberName: data.userName });
     res.status(200).send({ valid: true });
     return;
-  } catch (error) {
-    res.status(500).send({ error: 'Failed to validate lobby' });
+  } catch (error: unknown) {
+    res.status(500).send({ error: (error as {message: string})?.message || 'Failed to join lobby.' });
     return; 
   }
 });

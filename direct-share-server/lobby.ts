@@ -3,12 +3,13 @@ import Member from './member';
 export default class Lobby {
     lobbyId: string;
     lobbyName: string;
-    LobbyOwnerId: string = '';
+    LobbyOwnerId: string;
     lobbyMembers: Member[] = [];
 
-    constructor(lobbyId: string, lobbyName: string) {
+    constructor(lobbyId: string, lobbyOwnerId: string, lobbyName: string,) {
         this.lobbyId = lobbyId;
         this.lobbyName = lobbyName;
+        this.LobbyOwnerId = lobbyOwnerId;
     }
 
     addMember(member: Member) {
@@ -17,6 +18,8 @@ export default class Lobby {
                 this.LobbyOwnerId = member.memberId;
             }
             this.lobbyMembers.push(member);
+        } else if (this.lobbyMembers.length >= 2) {
+            throw new Error('Lobby is full');
         }
     }
 
