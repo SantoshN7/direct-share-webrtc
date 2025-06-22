@@ -29,4 +29,16 @@ export default class Lobby {
             this.LobbyOwnerId = this.lobbyMembers.length > 0 ? this.lobbyMembers[0].memberId : '';
         }
     }
+
+    isLobbyFull(): boolean {
+        return this.lobbyMembers.length >= 2;
+    }
+
+    isLobbyEmpty(): boolean {
+        return this.lobbyMembers.length === 0;
+    }
+
+    isValidLobbyMember(memberId: string): boolean {
+        return this.lobbyMembers.some(m => m.memberId === memberId);
+    }
 }
