@@ -6,6 +6,7 @@ import { Server } from 'socket.io';
 import { nanoid } from 'nanoid';
 
 import Lobby from './lobby';
+import Member from './member';
 
 const port = process.env.PORT || 3000;
 
@@ -24,14 +25,14 @@ const socketToUserId = new Map<string, string>();
 
 
 // server started
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
 io.on('connection', socket => {
   console.log('User connected', socket.id);
   // Handle lobby joining
-  socket.on('joinLobby', (lobbyId: string, userId: string) => {
+  socket.on('joinLobby', ({lobbyId, userId}: {lobbyId: string, userId: string}) => {
     if (!lobbyId || !userId) {
       console.error('Invalid lobbyId or userId');
       return;
@@ -46,11 +47,12 @@ io.on('connection', socket => {
       return;
     } else {
       // If the user is not a member, add them with a default name
-      lobby.addMember({ memberId: userId, memberName: 'No-name' });
+      lobby.addMember(new Member(userId, 'Guest'));
     }
     socket.join(lobbyId);
     socketToUserId.set(socket.id, userId);
-    socket.to(lobbyId).emit('lobbyStatusChanged', {lobby: lobbies.get(lobbyId) });
+    console.log('lobby joinned');
+    io.to(lobbyId).emit('lobbyStatusChanged', {lobby: lobbies.get(lobbyId) });
   });
   // Handle offer creation
   socket.on('createOffer', (lobbyId: string, offer: any, userId: string) => {
@@ -76,12 +78,31 @@ io.on('connection', socket => {
     }
     socket.to(lobbyId).emit('iceCandidate', { candidate });
   });
+  // Handle lobby member removal
+  socket.on('leaveLobby', ({lobbyId, userId}: {lobbyId: string, userId: string}) => {
+    if (!lobbyId || !userId) { 
+      console.error('lobbyId or userId is missing');
+      return;
+    }
+    const lobby = lobbies.get(lobbyId);
+    if (!lobby) {
+      console.error(`Lobby with ID ${lobbyId} not found`);
+      return;
+    }
+    // remove the user from the lobby
+    lobby.removeMember(userId);
+    // remove the socket from the userId map
+    socketToUserId.delete(socket.id);
+    // send updated lobby status to other members, if any 
+    io.to(lobbyId).emit('lobbyStatusChanged', { lobby: lobbies.get(lobbyId) });
+    // handle lobby deletion if empty
+    handleLobbyDeletion(lobbyId); 
+  });
   // Handle lobby disconnection
   socket.on('disconnect', () => { 
     console.log('User disconnected', socket.id);
     const rooms = Array.from(socket.rooms).filter(r => r !== socket.id);
     rooms.forEach(roomId => {
-      const roomSize = io.sockets.adapter.rooms.get(roomId)?.size || 0;
       const lobby = lobbies.get(roomId);
       if (!lobby) {
         console.error(`Lobby with ID ${roomId} not found`);
@@ -90,12 +111,9 @@ io.on('connection', socket => {
       // remove the user from the lobby
       lobby.removeMember(socketToUserId.get(socket.id) || '');
       // send updated lobby status to other member, if any
-      socket.to(roomId).emit('lobbyStatusChanged', { lobby });
+      io.to(roomId).emit('lobbyStatusChanged', { lobby: lobbies.get(roomId) });
       // handle lobby deletion if empty
-      if (roomSize === 0 && lobbies.has(roomId) && lobby.isLobbyEmpty()) {
-        console.log(`Room ${roomId} is empty, deleting lobby`);
-        lobbies.delete(roomId);
-      }
+      handleLobbyDeletion(roomId);
     });
     // remove the socket from the userId map
     socketToUserId.delete(socket.id);
@@ -114,7 +132,7 @@ app.post('/api/createLobby', (req, res) => {
     }
     const lobbyId = nanoid(10);
     const lobby = new Lobby(lobbyId, data.userId, data.lobbyName || 'Default Lobby');
-    lobby.addMember({ memberId: data.userId, memberName: data.userName });
+    lobby.addMember(new Member(data.userId, data.userName));
     lobbies.set(lobbyId, lobby);
     res.status(200).send({ lobbyId: lobbyId});
     return;
@@ -141,7 +159,7 @@ app.post('/api/joinLobby', (req, res) => {
       res.status(403).send({ error: 'Lobby is full.' });
       return;
     }
-    lobby.addMember({ memberId: data.userId, memberName: data.userName });
+    lobby.addMember(new Member(data.userId, data.userName));
     res.status(200).send({ valid: true });
     return;
   } catch (error: unknown) {
@@ -149,3 +167,21 @@ app.post('/api/joinLobby', (req, res) => {
     return; 
   }
 });
+
+// helper functions
+const handleLobbyDeletion = (lobbyId: string) => {
+  const lobby = lobbies.get(lobbyId);
+  if (!lobby) {
+    console.error(`Lobby with ID ${lobbyId} not found`);
+    return;
+  }
+  if (!lobby.isLobbyEmpty()) {
+    console.log(`Lobby ${lobbyId} is not empty, not deleting`);
+    return;
+  }
+  // delete the lobby
+  lobbies.delete(lobbyId);
+  // notify all sockets in the lobby
+  io.to(lobbyId).emit('lobbyDeleted', { lobbyId });
+  console.log(`Lobby ${lobbyId} deleted`);
+}

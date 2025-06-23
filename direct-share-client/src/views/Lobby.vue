@@ -4,42 +4,109 @@
 <template>
     <div class="ds-lobby-container">
         <div class="ds-lobby-left-panel">
-            <h2 class="ds-lobby-name">{{ 'lobby name' }}</h2>
+            <h2 class="ds-lobby-name">{{ lobby.lobbyName }}</h2>
             <div class="ds-lobby-status">
                 <p>{{ lobbyStatus }}</p>
             </div>
-            <div class="ds-lobby-members" v-if="members.length > 0">
+            <div class="ds-lobby-members" v-if="lobby.lobbyMembers.length > 0">
                 <p>Members:</p>
                 <ul>
-                    <li v-for="user in members" :key="user.id">{{ user.name }}</li>
+                    <li v-for="user in lobby.lobbyMembers" :key="user.memberId">{{ user.memberName }}</li>
                 </ul>
             </div>
 
         </div>
         <div class="ds-lobby-right-panel">
             <div class="ds-lobby-actions">
-                <button @click="sendFiles">Send Files</button>
-                <button @click="leaveLobby">Leave</button>
+                <button @click="sendFiles()">Send Files</button>
+                <button @click="leaveLobby()">Leave</button>
             </div>
         </div>
     </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, inject } from 'vue';
+import { useRouter } from 'vue-router';
+import clientSocket from '../socket';
+import {Lobby} from '';
 
-const members = ref([]);
-const lobbyStatus = ref('Waiting for members...');
+interface ILobbyInfo {
+    lobbyId: string;
+    lobbyName: string;
+    LobbyOwnerId: string;
+    lobbyMembers: {memberId: string; memberName: string}[];
+    lobbyStatus: 'ready' | 'not-ready';
+}
+
+const lobby = ref<ILobbyInfo>({
+    lobbyName: 'Default Lobby',
+    lobbyStatus: 'not-ready',
+    lobbyMembers: []
+});
+
+const lobbyStatus = computed(() => {
+    return lobby.value.status === 'ready' ? 'Ready to send files' : 'Waiting for members';
+});
+
+const router = useRouter();
+
+const userId = inject<string>('userId');
+const lobbyId = router.currentRoute._value.params.id as string;
 
 function leaveLobby() {
     // Logic to leave the lobby
     console.log('Leaving lobby...');
+    router.push({ name: 'home' });
 }
 
 function sendFiles() {
     // Logic to send files
     console.log('Sending files...');
 }
+
+onMounted(() => {
+    if (!userId || !lobbyId) {
+        console.error('User ID or lobby ID is not provided');
+        return;
+    }
+
+    clientSocket.emit("joinLobby", { lobbyId: lobbyId, userId: userId });
+    
+    clientSocket.on("lobbyStatusChanged", (data: {lobby: ILobbyInfo}) => {
+        console.log("Lobby status changed:", data.lobby);
+        lobby.value = data.lobby
+    });
+
+    clientSocket.on("offerCreated", (offer: any) => {
+        console.log("Offer created:", offer);
+        // Handle the offer creation logic here
+    });
+
+    clientSocket.on("answerCreated", (answer: any) => {
+        console.log("Answer created:", answer);
+        // Handle the answer creation logic here
+    });
+
+    clientSocket.on("iceCandidate", (candidate: any) => {
+        console.log("ICE Candidate received:", candidate);
+        // Handle the ICE candidate logic here
+    });
+
+    clientSocket.on("lobbyDeleted", (lobbyId: string) => {
+        leaveLobby();
+        console.log(`Lobby ${lobbyId} has been deleted.`);
+    });
+});
+
+onBeforeUnmount(() => {
+    clientSocket.emit("leaveLobby", { lobbyId: lobbyId, userId: userId });
+    clientSocket.off("lobbyStatusChanged");
+    clientSocket.off("offerCreated");
+    clientSocket.off("answerCreated");
+    clientSocket.off("iceCandidate");
+    clientSocket.off("lobbyDeleted");
+});
 </script>
 
 <style scoped>

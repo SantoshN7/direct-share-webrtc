@@ -4,7 +4,7 @@ import { RouterLink, RouterView } from 'vue-router'
 import { nanoid } from 'nanoid';
 
 const userId = nanoid(10);
-provide('userId', readonly(ref(userId)));
+provide('userId', userId);
 
 </script>
 

@@ -5,6 +5,7 @@ export default class Lobby {
     lobbyName: string;
     LobbyOwnerId: string;
     lobbyMembers: Member[] = [];
+    lobbyStatus: 'ready' | 'not-ready' = 'not-ready';
 
     constructor(lobbyId: string, lobbyOwnerId: string, lobbyName: string,) {
         this.lobbyId = lobbyId;
@@ -13,13 +14,12 @@ export default class Lobby {
     }
 
     addMember(member: Member) {
-        if (this.lobbyMembers.length < 2 && !this.lobbyMembers.some(m => m.memberId === member.memberId)) {
+        if (this.lobbyMembers.length < 2 && !this.lobbyMembers.some((m: Member) => m.memberId === member.memberId)) {
             if (!this.LobbyOwnerId) {
                 this.LobbyOwnerId = member.memberId;
             }
             this.lobbyMembers.push(member);
-        } else if (this.lobbyMembers.length >= 2) {
-            throw new Error('Lobby is full');
+            console.log(`Member added: ${member.memberName} (${member.memberId}) to lobby ${this.lobbyId}`);
         }
     }
 
