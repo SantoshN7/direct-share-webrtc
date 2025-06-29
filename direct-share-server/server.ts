@@ -53,25 +53,27 @@ io.on('connection', socket => {
     socketToUserId.set(socket.id, userId);
     console.log('lobby joinned');
     io.to(lobbyId).emit('lobbyStatusChanged', {lobby: lobbies.get(lobbyId) });
+    // Notify the user of successful join
+    socket.emit('lobbyJoined', { lobbyId: lobbyId, userId: userId });
   });
   // Handle offer creation
-  socket.on('createOffer', (lobbyId: string, offer: any, userId: string) => {
+  socket.on('sendOffer', (lobbyId: string, offer: any, userId: string) => {
     if (!lobbyId || !offer || !userId) {
       console.error('lobbyId, offer, or userId is missing');
       return;
     }
-    socket.to(lobbyId).emit('offerCreated', { offer });
+    socket.to(lobbyId).emit('incomingOffer', { offer });
   });
   // Handle answer creation
-  socket.on('createAnswer', (lobbyId: string, answer: any, userId: string) => {
+  socket.on('sendAnswer', (lobbyId: string, answer: any, userId: string) => {
     if (!lobbyId || !answer || !userId) {
       console.error('lobbyId, answer, or userId is missing');
       return;
     }
-    socket.to(lobbyId).emit('answerCreated', { answer });
+    socket.to(lobbyId).emit('incomingAsnwer', { answer });
   });
   // Handle ICE candidate exchange
-  socket.on('iceCandidate', (lobbyId: string, candidate: any, userId: string) => {
+  socket.on('sendIceCandidate', (lobbyId: string, candidate: any, userId: string) => {
     if (!lobbyId || !candidate || !userId) { 
       console.error('lobbyId, candidate, or userId is missing');
       return;

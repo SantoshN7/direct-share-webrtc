@@ -53,6 +53,8 @@ const router = useRouter();
 
 const userId = inject<string>('userId');
 const lobbyId = router.currentRoute._value.params.id as string;
+let peerConnection: RTCPeerConnection | null = null;
+let dataChannel: RTCDataChannel | null = null;
 
 function leaveLobby() {
     // Logic to leave the lobby
@@ -65,32 +67,84 @@ function sendFiles() {
     console.log('Sending files...');
 }
 
+async function createOffer() {
+    if (!peerConnection || !dataChannel) return; 
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    clientSocket.emit("sendOffer", { offer: offer, lobbyId: lobbyId, userId: userId });
+    console.log("Offer created and sent:", offer);
+}
+
+async function createAnswer() {
+    if (!peerConnection || !dataChannel) return;
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    clientSocket.emit("sendAnswer", { answer: answer, lobbyId: lobbyId, userId: userId });
+    console.log("Answer created and sent:", answer);
+}
+
 onMounted(() => {
     if (!userId || !lobbyId) {
         console.error('User ID or lobby ID is not provided');
         return;
     }
 
+    // Initialize the peer connection and data channel
+    peerConnection = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    dataChannel = peerConnection.createDataChannel('fileTransfer');
+
+    // send ice candidates to the server
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            clientSocket.emit("sendIceCandidate", { candidate: event.candidate, lobbyId: lobbyId, userId: userId });
+            console.log("ICE Candidate sent:", event.candidate);
+        }
+    };
+
+    dataChannel.onopen = () => {
+        console.log("Data channel is open");
+    };
+
     clientSocket.emit("joinLobby", { lobbyId: lobbyId, userId: userId });
     
     clientSocket.on("lobbyStatusChanged", (data: {lobby: ILobbyInfo}) => {
         console.log("Lobby status changed:", data.lobby);
-        lobby.value = data.lobby
+        Object.assign(lobby.value, data.lobby);
     });
 
-    clientSocket.on("offerCreated", (offer: any) => {
-        console.log("Offer created:", offer);
-        // Handle the offer creation logic here
+    clientSocket.on("lobbyJoined", (data: {lobbyId: string; userId: string}) => {
+        console.log("Lobby joined:", data.lobbyId, data.userId);
+        if (lobby.value.lobbyId === data.lobbyId && lobby.value.lobbyStatus === 'ready' && data.userId === userId) {
+            // If the lobby is ready, create an offer
+            createOffer();
+        }
     });
 
-    clientSocket.on("answerCreated", (answer: any) => {
-        console.log("Answer created:", answer);
-        // Handle the answer creation logic here
+    clientSocket.on("incomingOffer", async(offer: RTCSessionDescriptionInit) => {
+        console.log("Offer received:", offer);
+
+        if (offer) {
+            await peerConnection?.setRemoteDescription(new RTCSessionDescription(offer));
+            createAnswer();
+        }
     });
 
-    clientSocket.on("iceCandidate", (candidate: any) => {
+    clientSocket.on("incomingAsnwer", (answer: RTCSessionDescriptionInit) => {
+        console.log("Answer received:", answer);
+        if (answer) {
+            peerConnection?.setRemoteDescription(new RTCSessionDescription(answer));
+        }
+    });
+
+    clientSocket.on("iceCandidate", async (candidate: RTCIceCandidateInit) => {
         console.log("ICE Candidate received:", candidate);
         // Handle the ICE candidate logic here
+        if (candidate) {
+            await peerConnection?.addIceCandidate(new RTCIceCandidate(candidate));
+        }
     });
 
     clientSocket.on("lobbyDeleted", (lobbyId: string) => {
@@ -106,6 +160,8 @@ onBeforeUnmount(() => {
     clientSocket.off("answerCreated");
     clientSocket.off("iceCandidate");
     clientSocket.off("lobbyDeleted");
+    dataChannel?.close();
+    peerConnection?.close();
 });
 </script>
 

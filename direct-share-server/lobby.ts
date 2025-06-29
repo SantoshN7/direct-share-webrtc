@@ -21,12 +21,18 @@ export default class Lobby {
             this.lobbyMembers.push(member);
             console.log(`Member added: ${member.memberName} (${member.memberId}) to lobby ${this.lobbyId}`);
         }
+        if (this.lobbyMembers.length >= 2) {
+            this.lobbyStatus = 'ready';
+        }
     }
 
     removeMember(memberId: string) {
         this.lobbyMembers = this.lobbyMembers.filter(m => m.memberId !== memberId);
         if (this.LobbyOwnerId === memberId) {
             this.LobbyOwnerId = this.lobbyMembers.length > 0 ? this.lobbyMembers[0].memberId : '';
+        }
+        if (this.lobbyMembers.length < 2) {
+            this.lobbyStatus = 'not-ready';
         }
     }
 
