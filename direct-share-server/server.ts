@@ -57,27 +57,30 @@ io.on('connection', socket => {
     socket.emit('lobbyJoined', { lobbyId: lobbyId, userId: userId });
   });
   // Handle offer creation
-  socket.on('sendOffer', (lobbyId: string, offer: any, userId: string) => {
+  socket.on('sendOffer', ({lobbyId, offer, userId}: {lobbyId: string, offer: any, userId: string}) => {
     if (!lobbyId || !offer || !userId) {
       console.error('lobbyId, offer, or userId is missing');
       return;
     }
+     console.log('offer forwarded');
     socket.to(lobbyId).emit('incomingOffer', { offer });
   });
   // Handle answer creation
-  socket.on('sendAnswer', (lobbyId: string, answer: any, userId: string) => {
+  socket.on('sendAnswer', ({lobbyId, answer, userId}: {lobbyId: string, answer: any, userId: string}) => {
     if (!lobbyId || !answer || !userId) {
       console.error('lobbyId, answer, or userId is missing');
       return;
     }
-    socket.to(lobbyId).emit('incomingAsnwer', { answer });
+    console.log('answer forwarded');
+    socket.to(lobbyId).emit('incomingAnswer', { answer });
   });
   // Handle ICE candidate exchange
-  socket.on('sendIceCandidate', (lobbyId: string, candidate: any, userId: string) => {
+  socket.on('sendIceCandidate', ({lobbyId, candidate, userId}: {lobbyId: string, candidate: any, userId: string}) => {
     if (!lobbyId || !candidate || !userId) { 
       console.error('lobbyId, candidate, or userId is missing');
       return;
     }
+    console.log('ice candidate forwarded');
     socket.to(lobbyId).emit('iceCandidate', { candidate });
   });
   // Handle lobby member removal

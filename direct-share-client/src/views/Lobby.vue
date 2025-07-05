@@ -58,7 +58,6 @@ let dataChannel: RTCDataChannel | null = null;
 
 function leaveLobby() {
     // Logic to leave the lobby
-    console.log('Leaving lobby...');
     router.push({ name: 'home' });
 }
 
@@ -68,16 +67,18 @@ function sendFiles() {
 }
 
 async function createOffer() {
-    if (!peerConnection || !dataChannel) return; 
+    if (!peerConnection) return; 
     const offer = await peerConnection.createOffer();
+    console.log("setLocalDescription with offer:", offer);
     await peerConnection.setLocalDescription(offer);
     clientSocket.emit("sendOffer", { offer: offer, lobbyId: lobbyId, userId: userId });
     console.log("Offer created and sent:", offer);
 }
 
 async function createAnswer() {
-    if (!peerConnection || !dataChannel) return;
+    if (!peerConnection) return;
     const answer = await peerConnection.createAnswer();
+    console.log("setLocalDescription with answer:", answer);
     await peerConnection.setLocalDescription(answer);
     clientSocket.emit("sendAnswer", { answer: answer, lobbyId: lobbyId, userId: userId });
     console.log("Answer created and sent:", answer);
@@ -94,15 +95,20 @@ onMounted(() => {
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
-    dataChannel = peerConnection.createDataChannel('fileTransfer');
-
-    // send ice candidates to the server
+     // send ice candidates to the server
     peerConnection.onicecandidate = (event) => {
+        console.log("ICE Candidate:", event.candidate);
         if (event.candidate) {
             clientSocket.emit("sendIceCandidate", { candidate: event.candidate, lobbyId: lobbyId, userId: userId });
             console.log("ICE Candidate sent:", event.candidate);
+        } else {
+            console.log("connnection is stable, no more candidates to send");
         }
     };
+
+
+    dataChannel = peerConnection.createDataChannel('fileTransfer');
+
 
     dataChannel.onopen = () => {
         console.log("Data channel is open");
@@ -115,49 +121,47 @@ onMounted(() => {
         Object.assign(lobby.value, data.lobby);
     });
 
-    clientSocket.on("lobbyJoined", (data: {lobbyId: string; userId: string}) => {
-        console.log("Lobby joined:", data.lobbyId, data.userId);
+    clientSocket.on("lobbyJoined", async (data: {lobbyId: string; userId: string}) => {
         if (lobby.value.lobbyId === data.lobbyId && lobby.value.lobbyStatus === 'ready' && data.userId === userId) {
             // If the lobby is ready, create an offer
             createOffer();
         }
     });
 
-    clientSocket.on("incomingOffer", async(offer: RTCSessionDescriptionInit) => {
-        console.log("Offer received:", offer);
-
+    clientSocket.on("incomingOffer", async ({offer}:{offer: RTCSessionDescriptionInit}) => {
         if (offer) {
-            await peerConnection?.setRemoteDescription(new RTCSessionDescription(offer));
+            console.log('setRemoteDescription with offer:', offer);
+            await peerConnection?.setRemoteDescription(offer);
             createAnswer();
         }
     });
 
-    clientSocket.on("incomingAsnwer", (answer: RTCSessionDescriptionInit) => {
-        console.log("Answer received:", answer);
+    clientSocket.on("incomingAnswer", async ({answer}: {answer: RTCSessionDescriptionInit}) => {
         if (answer) {
-            peerConnection?.setRemoteDescription(new RTCSessionDescription(answer));
+            console.log('setRemoteDescription with answer:', answer);
+            await peerConnection?.setRemoteDescription(answer);
         }
     });
 
-    clientSocket.on("iceCandidate", async (candidate: RTCIceCandidateInit) => {
+    clientSocket.on("iceCandidate", async ({candidate}: {candidate: RTCIceCandidateInit}) => {
         console.log("ICE Candidate received:", candidate);
         // Handle the ICE candidate logic here
         if (candidate) {
-            await peerConnection?.addIceCandidate(new RTCIceCandidate(candidate));
+            await peerConnection?.addIceCandidate(candidate);
         }
     });
 
     clientSocket.on("lobbyDeleted", (lobbyId: string) => {
         leaveLobby();
-        console.log(`Lobby ${lobbyId} has been deleted.`);
     });
 });
 
 onBeforeUnmount(() => {
     clientSocket.emit("leaveLobby", { lobbyId: lobbyId, userId: userId });
     clientSocket.off("lobbyStatusChanged");
-    clientSocket.off("offerCreated");
-    clientSocket.off("answerCreated");
+    clientSocket.off("lobbyJoined");
+    clientSocket.off("incomingOffer");
+    clientSocket.off("incomingAnswer");
     clientSocket.off("iceCandidate");
     clientSocket.off("lobbyDeleted");
     dataChannel?.close();
