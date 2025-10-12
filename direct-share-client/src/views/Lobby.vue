@@ -18,8 +18,23 @@
         </div>
         <div class="ds-lobby-right-panel">
             <div class="ds-lobby-actions">
+                <input type="file" ref="fileInput"/> 
                 <button @click="sendFiles()">Send Files</button>
                 <button @click="leaveLobby()">Leave</button>
+            </div>
+            <div class="ds-lobby-file-transfer">
+                <div class="ds-file-queue">
+                    <h3>Outgoing files</h3>
+                    <div v-for="file in outgoingFiles" :key="file.name">
+                        <p>{{ file.name }} - {{ file.size }} bytes</p>
+                    </div>
+                </div>
+                <div class="ds-file-queue">
+                    <h3>Receiving files</h3>
+                    <div v-for="file in incomingFiles" :key="file.name">
+                        <p>{{ file.name }} - {{ file.size }} bytes</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -55,6 +70,9 @@ const userId = inject<string>('userId');
 const lobbyId = router.currentRoute._value.params.id as string;
 let peerConnection: RTCPeerConnection | null = null;
 let dataChannel: RTCDataChannel | null = null;
+const fileInput = ref<HTMLInputElement | null>(null);
+const outgoingFiles = ref<File[]>([]);
+const incomingFiles = ref<File[]>([]);
 
 function leaveLobby() {
     // Logic to leave the lobby
@@ -64,6 +82,78 @@ function leaveLobby() {
 function sendFiles() {
     // Logic to send files
     console.log('Sending files...');
+    if (!dataChannel || dataChannel.readyState !== 'open') {
+        console.error('Data channel is not open');
+        return;
+    }
+    const file = fileInput.value?.files[0];
+    if (!!file) {
+        outgoingFiles.value.push(file);
+        sendFileChunks(file, dataChannel);
+    } else {
+        console.warn('No file selected');
+    }
+}
+
+async function sendFileChunks(file, channel) {
+  const CHUNK_SIZE = 16 * 1024; // 16 KB per chunk
+  const MAX_BUFFERED_AMOUNT = 2_000_000; // 2 MB safety limit
+
+  // Optional: send file metadata first
+  const metadata = {
+    type: 'meta',
+    name: file.name,
+    size: file.size,
+    mime: file.type
+  };
+  channel.send(JSON.stringify(metadata));
+
+  let offset = 0;
+
+  while (offset < file.size) {
+    const chunk = file.slice(offset, offset + CHUNK_SIZE);
+    const buffer = await chunk.arrayBuffer();
+
+    // Wait if the buffer is too full
+    await waitForBufferDrain(channel, MAX_BUFFERED_AMOUNT);
+
+    channel.send(buffer);
+    offset += buffer.byteLength;
+  }
+
+  // ✅ All chunks sent — signal completion
+  channel.send(JSON.stringify({ type: 'done', name: file.name }));
+  console.log(`✅ Sent file "${file.name}" (${file.size} bytes)`);
+}
+
+function waitForBufferDrain(channel, max = 2_000_000) {
+  return new Promise(resolve => {
+    if (channel.bufferedAmount < max) return resolve();
+
+    const handler = () => {
+      if (channel.bufferedAmount < max) {
+        channel.removeEventListener('bufferedamountlow', handler);
+        resolve();
+      }
+    };
+
+    channel.bufferedAmountLowThreshold = max / 2;
+    channel.addEventListener('bufferedamountlow', handler);
+  });
+}
+
+function downloadReceivedFile(chunks, fileName) {
+    const blob = new Blob(chunks);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }, 0); 
 }
 
 async function createOffer() {
@@ -106,12 +196,55 @@ onMounted(() => {
         }
     };
 
+    // Create data channel for file transfer
 
     dataChannel = peerConnection.createDataChannel('fileTransfer');
 
 
     dataChannel.onopen = () => {
         console.log("Data channel is open");
+    };
+
+    dataChannel.onclose = () => {
+        console.log("Data channel is closed");
+    };
+
+    // Receiving data channel from remote peer
+
+    peerConnection.ondatachannel = (event) => {
+        const receiveChannel = event.channel;
+        const fileChunk = [];
+
+        receiveChannel.onmessage = (event) => {
+            console.log("Data channel message received:", event.data);
+            // Handle incoming messages (file chunks, metadata, etc.)
+            if (typeof event.data === 'string') {
+                const message = JSON.parse(event.data);
+                if (message.type === 'meta') {
+                    console.log(`Receiving file "${message.name}" (${message.size} bytes)`);
+                    incomingFiles.value.push({ name: message.name, size: message.size });
+                    // Initialize receiving file logic here
+                } else if (message.type === 'done') {
+                    console.log(`✅ Received file "${message.name}" completely`);
+                    // Finalize receiving file logic here
+                    downloadReceivedFile(fileChunk, message.name);
+                    fileChunk = [];
+                }
+            } else if (event.data instanceof ArrayBuffer) {
+                // Handle binary data (file chunks)
+                fileChunk.push(event.data);
+                console.log(`Received ${event.data.byteLength} bytes of file data`);
+                // Append chunk to the receiving file logic here
+            }
+        };
+
+        receiveChannel.onopen = () => {
+            console.log("Receive channel is open");
+        };
+
+        receiveChannel.onclose = () => {
+            console.log("Receive channel is closed");
+        };
     };
 
     clientSocket.emit("joinLobby", { lobbyId: lobbyId, userId: userId });
@@ -187,8 +320,8 @@ onBeforeUnmount(() => {
 .ds-lobby-right-panel {
     display: flex;
     flex: 1;
-    flex-direction: row;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
 }
 .ds-lobby-actions {
     display: flex;
