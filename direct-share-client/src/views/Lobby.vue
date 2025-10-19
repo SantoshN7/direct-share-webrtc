@@ -1,6 +1,3 @@
-<script setup lang="ts">
-</script>
-
 <template>
     <div class="ds-lobby-container">
         <div class="ds-lobby-left-panel">
@@ -18,7 +15,7 @@
         </div>
         <div class="ds-lobby-right-panel">
             <div class="ds-lobby-actions">
-                <input type="file" ref="fileInput"/> 
+                <input type="file" ref="fileInput" multiple/> 
                 <button @click="sendFiles()">Send Files</button>
                 <button @click="leaveLobby()">Leave</button>
             </div>
@@ -44,7 +41,6 @@
 import { ref, onMounted, onBeforeUnmount, computed, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import clientSocket from '../socket';
-import {Lobby} from '';
 
 interface ILobbyInfo {
     lobbyId: string;
@@ -79,23 +75,25 @@ function leaveLobby() {
     router.push({ name: 'home' });
 }
 
-function sendFiles() {
+async function sendFiles() {
     // Logic to send files
     console.log('Sending files...');
     if (!dataChannel || dataChannel.readyState !== 'open') {
         console.error('Data channel is not open');
         return;
     }
-    const file = fileInput.value?.files[0];
-    if (!!file) {
-        outgoingFiles.value.push(file);
-        sendFileChunks(file, dataChannel);
+    const files = fileInput.value?.files;
+    if (!!files && files.length > 0) {
+        for (const file of  Array.from(files)) {
+            outgoingFiles.value.push(file);
+            await sendFileChunks(file, dataChannel as RTCDataChannel);
+        }
     } else {
         console.warn('No file selected');
     }
 }
 
-async function sendFileChunks(file, channel) {
+async function sendFileChunks(file: File, channel: RTCDataChannel) {
   const CHUNK_SIZE = 16 * 1024; // 16 KB per chunk
   const MAX_BUFFERED_AMOUNT = 2_000_000; // 2 MB safety limit
 
@@ -126,14 +124,14 @@ async function sendFileChunks(file, channel) {
   console.log(`✅ Sent file "${file.name}" (${file.size} bytes)`);
 }
 
-function waitForBufferDrain(channel, max = 2_000_000) {
+function waitForBufferDrain(channel: RTCDataChannel, max = 2_000_000) {
   return new Promise(resolve => {
-    if (channel.bufferedAmount < max) return resolve();
+    if (channel.bufferedAmount < max) return resolve(true);
 
     const handler = () => {
       if (channel.bufferedAmount < max) {
         channel.removeEventListener('bufferedamountlow', handler);
-        resolve();
+        resolve(true);
       }
     };
 
@@ -142,7 +140,7 @@ function waitForBufferDrain(channel, max = 2_000_000) {
   });
 }
 
-function downloadReceivedFile(chunks, fileName) {
+function downloadReceivedFile(chunks: BlobPart[], fileName: string) {
     const blob = new Blob(chunks);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -213,7 +211,7 @@ onMounted(() => {
 
     peerConnection.ondatachannel = (event) => {
         const receiveChannel = event.channel;
-        const fileChunk = [];
+        let fileChunk: BlobPart[] = [];
 
         receiveChannel.onmessage = (event) => {
             console.log("Data channel message received:", event.data);
@@ -284,7 +282,7 @@ onMounted(() => {
         }
     });
 
-    clientSocket.on("lobbyDeleted", (lobbyId: string) => {
+    clientSocket.on("lobbyDeleted", () => {
         leaveLobby();
     });
 });
