@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client';
+import { serverUrl } from './config';
 
-const socketUrl = import.meta.env.SOCKET_URL || 'http://localhost:3000';
+const socketUrl = serverUrl;
 
 const clientSocket: Socket = io(socketUrl, {
   withCredentials: true,

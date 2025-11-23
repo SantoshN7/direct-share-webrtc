@@ -2,6 +2,7 @@
 import { inject, ref } from 'vue';
 import axios from 'axios';
 import { useRouter } from 'vue-router'
+import { serverUrl } from '../config';
 
 const router = useRouter();
 const createLobbyDialog = ref<HTMLDialogElement | null>(null);
@@ -15,7 +16,7 @@ const formData = ref({
 // Functions to handle creating and joining lobbies
 function createLobby() {
   // Logic to create a lobby
-  axios.post('http://localhost:3000/api/createLobby', {
+  axios.post(`${serverUrl}/api/createLobby`, {
     userName: formData.value.userName,
     userId: userId,
   })
@@ -35,7 +36,7 @@ function createLobby() {
 
 function joinLobby() {
   // Logic to join a lobby
-  axios.post('http://localhost:3000/api/joinLobby', {
+  axios.post(`${serverUrl}/api/joinLobby`, {
     userName: formData.value.userName,
     userId: userId,
     lobbyId: formData.value.lobbyCode,
