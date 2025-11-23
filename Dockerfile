@@ -1,6 +1,12 @@
 # Stage 1: Build the Vue.js application
 FROM node:20 AS direct-share-client-builder
 
+# Add build argument for Vite env
+ARG VITE_SERVER_URL
+
+# Expose that ARG as an env var (Vite reads env vars)
+ENV VITE_SERVER_URL=$VITE_SERVER_URL
+
 WORKDIR /app/direct-share-client
 
 # Copy Vue.js app files
