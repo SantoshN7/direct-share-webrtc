@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import http from 'http';
+import path from 'path';
 import { Server } from 'socket.io';
 import { nanoid } from 'nanoid';
 
@@ -125,7 +126,13 @@ io.on('connection', socket => {
   });
 });
 
+// serve static Vue files
+app.use(express.static(path.join(__dirname, "client")));
 
+// fallback to index.html for SPA routing
+app.get(/.*/, (req, res) => {
+    res.sendFile(path.join(__dirname, "client", "index.html"));
+});
 
 // API endpoint to receive data// POST route
 app.post('/api/createLobby', (req, res) => {

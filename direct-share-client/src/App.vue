@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, readonly, provide} from 'vue';
+import {provide} from 'vue';
 import { RouterLink, RouterView } from 'vue-router'
 import { nanoid } from 'nanoid';
 

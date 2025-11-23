@@ -1,10 +1,12 @@
 import { io, Socket } from 'socket.io-client';
 
-const clientSocket: Socket = io('http://localhost:3000',  {
+const socketUrl = import.meta.env.SOCKET_URL || 'http://localhost:3000';
+
+const clientSocket: Socket = io(socketUrl, {
   withCredentials: true,
-  secure: true,
-  rejectUnauthorized: true,
-  transports: ["websocket", "polling"] // Force fallback if needed
-}); // your server URL
+  secure: socketUrl.startsWith('https'),
+  rejectUnauthorized: import.meta.env.MODE === 'production',
+  transports: ["websocket", "polling"]
+});
 
 export default clientSocket;
