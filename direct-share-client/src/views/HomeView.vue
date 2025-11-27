@@ -41,7 +41,7 @@ function joinLobby() {
     userId: userId,
     lobbyId: formData.value.lobbyCode,
   })
-  .then((response) => {
+  .then(() => {
     joinLobbyDialog.value?.close();
     router.push({
       path: `/lobby/${formData.value.lobbyCode}`,
@@ -56,17 +56,6 @@ function joinLobby() {
     formData.value.lobbyCode = '';
   });
 }
-
-function openCreateLobbyDialog() {
-  errorMessage.value = ''; // Reset error message
-  createLobbyDialog.value?.showModal();
-}
-
-function openJoinLobbyDialog() {
-  errorMessage.value = ''; // Reset error message
-  joinLobbyDialog.value?.showModal();
-}
-
 </script>
 
 <template>

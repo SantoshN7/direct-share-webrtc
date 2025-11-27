@@ -14,6 +14,12 @@ provide('userId', userId);
     <div class="ds-header-description">
       <span>Share files directly</span>
     </div>
+    <div class="ds-about">
+      <RouterLink to="/about">About</RouterLink>
+    </div>
+    <div class="ds-about">
+      <RouterLink to="/terms">Terms + Privacy + Disclaimer</RouterLink>
+    </div>
   </div>
   <RouterView />
 </template>
@@ -23,6 +29,7 @@ provide('userId', userId);
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 5px;
   padding: 20px;
   border-bottom: 1px solid #ccc;
   background-color: #f9f9f9;
@@ -34,6 +41,12 @@ provide('userId', userId);
   z-index: 1000;
   font-family: Arial, sans-serif;
   color: #333;
+}
+.ds-about {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  margin-right: 10px;
 }
 .ds-header-text {
   font-size: 2rem;
